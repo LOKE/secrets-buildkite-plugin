@@ -10,4 +10,4 @@ configuration:
       type: string
     env:
       type: object
-  required: ["arn-role"]
+  required: ["role-arn"]
