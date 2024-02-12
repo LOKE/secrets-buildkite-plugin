@@ -8,11 +8,13 @@ if [[ -z "${BUILDKITE_PLUGIN_SECRETS_ROLE_ARN:-}" ]]; then
 fi
 
 function get_secrets {
-    echo "~~~ :buildkite::key::aws: Requesting an OIDC token for AWS from buildkite"
+    echo "~~~ Requesting an OIDC token for AWS from buildkite"
+
+    buildkite-agent oidc request-token --audience sts.amazonaws.com
 
     BUILDKITE_OIDC_TOKEN="$(buildkite-agent oidc request-token --audience sts.amazonaws.com)"
 
-    echo "~~~ :aws: Assuming role using OIDC token"
+    echo "~~~ Assuming role using OIDC token"
 
     echo "Role ARN: ${BUILDKITE_PLUGIN_SECRETS_ROLE_ARN}"
 
@@ -32,6 +34,7 @@ function get_secrets {
     local -x AWS_SECRET_ACCESS_KEY="$(jq -r ".Credentials.SecretAccessKey" <<< "${RESPONSE}")"
     local -x AWS_SESSION_TOKEN="$(jq -r ".Credentials.SessionToken" <<< "${RESPONSE}")"
 
+    echo "~~~ Load secrets from ssm parameter store"
     
     # parse env items
     while IFS='=' read -r name _ ; do
