@@ -1,0 +1,47 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if [[ -z "${BUILDKITE_PLUGIN_SECRETS_ROLE_ARN:-}" ]]; then
+  echo "🚨 Missing 'role-arn' plugin configuration"
+  exit 1
+fi
+
+function get_secrets {
+    echo "~~~ :buildkite::key::aws: Requesting an OIDC token for AWS from buildkite"
+
+    BUILDKITE_OIDC_TOKEN="$(buildkite-agent oidc request-token --audience sts.amazonaws.com)"
+
+    echo "~~~ :aws: Assuming role using OIDC token"
+
+    echo "Role ARN: ${BUILDKITE_PLUGIN_SECRETS_ROLE_ARN}"
+
+    RESPONSE="$(aws sts assume-role-with-web-identity \
+    --role-arn "${BUILDKITE_PLUGIN_SECRETS_ROLE_ARN}" \
+    --role-session-name "buildkite-job-${BUILDKITE_JOB_ID}" \
+    --web-identity-token "${BUILDKITE_OIDC_TOKEN}")"
+
+    if [[ $? -ne 0 ]]; then
+        echo "^^^ +++"
+        echo "Failed to assume AWS role:"
+        echo "${RESPONSE}"
+        exit 1
+    fi
+
+    local -x AWS_ACCESS_KEY_ID="$(jq -r ".Credentials.AccessKeyId" <<< "${RESPONSE}")"
+    local -x AWS_SECRET_ACCESS_KEY="$(jq -r ".Credentials.SecretAccessKey" <<< "${RESPONSE}")"
+    local -x AWS_SESSION_TOKEN="$(jq -r ".Credentials.SessionToken" <<< "${RESPONSE}")"
+
+    
+    # parse env items
+    while IFS='=' read -r name _ ; do
+    if [[ $name =~ ^(BUILDKITE_PLUGIN_SECRETS_ENV_) ]] ; then
+        export_name="${name//BUILDKITE_PLUGIN_SECRETS_ENV_/}"
+        export_value="$(aws ssm get-parameter --name "${!name}" --with-decryption --query "Parameter.Value" --output text)"
+
+        export "${export_name}"="${export_value}"
+    fi
+    done < <(env | sort)
+}
+
+get_secrets

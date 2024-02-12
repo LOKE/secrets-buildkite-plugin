@@ -1,0 +1,13 @@
+name: "LOKE Secrets"
+description: Read secrets from AWS SSM param store using an assumed buildkite role
+author: https://github.com/LOKE
+requirements:
+  - aws
+  - jq
+configuration:
+  properties:
+    role-arn:
+      type: string
+    env:
+      type: object
+  required: ["arn-role"]
