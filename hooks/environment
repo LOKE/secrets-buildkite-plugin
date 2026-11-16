@@ -8,9 +8,29 @@ if [[ -z "${BUILDKITE_PLUGIN_SECRETS_ROLE_ARN:-}" ]]; then
 fi
 
 function get_secrets {
+    # parse vars items, read from /buildkite-secrets/<pipeline>/env/<NAME>
+    VARS=()
+    i=0
+    while name="BUILDKITE_PLUGIN_SECRETS_VARS_${i}" && [[ -n "${!name+set}" ]]; do
+        # Checked before fetching: bash prints the value when export rejects a name
+        if [[ ! "${!name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            echo "🚨 Invalid vars name: '${!name}'"
+            exit 1
+        fi
+        VARS+=("${!name}")
+        i=$((i + 1))
+    done
+
     echo "~~~ Requesting an OIDC token for AWS from buildkite"
 
-    BUILDKITE_OIDC_TOKEN="$(buildkite-agent oidc request-token --audience sts.amazonaws.com)"
+    TOKEN_ARGS=(--audience sts.amazonaws.com)
+    # The role for vars scopes access by the pipeline_slug session tag. Session tags need
+    # sts:TagSession in the role's trust policy, so they're only sent when vars is used.
+    if [[ ${#VARS[@]} -gt 0 ]]; then
+        TOKEN_ARGS+=(--aws-session-tag "organization_slug,pipeline_slug")
+    fi
+
+    BUILDKITE_OIDC_TOKEN="$(buildkite-agent oidc request-token "${TOKEN_ARGS[@]}")"
 
     echo "~~~ Assuming role using OIDC token"
 
@@ -34,6 +54,22 @@ function get_secrets {
 
     echo "~~~ Load secrets from ssm parameter store"
     
+    if [[ ${#VARS[@]} -gt 0 ]]; then
+        PREFIX="/buildkite-secrets/${BUILDKITE_PIPELINE_SLUG}/env"
+        PARAMS="$(aws ssm get-parameters --names "${VARS[@]/#/${PREFIX}/}" --with-decryption --output json)"
+
+        MISSING="$(jq -r '.InvalidParameters // [] | join(", ")' <<< "${PARAMS}")"
+        if [[ -n "${MISSING}" ]]; then
+            echo "^^^ +++"
+            echo "🚨 Missing SSM parameters: ${MISSING}"
+            exit 1
+        fi
+
+        for name in "${VARS[@]}"; do
+            export "${name}"="$(jq -r --arg name "${PREFIX}/${name}" '.Parameters[] | select(.Name == $name) | .Value' <<< "${PARAMS}")"
+        done
+    fi
+
     # parse env items
     while IFS='=' read -r name _ ; do
     if [[ $name =~ ^(BUILDKITE_PLUGIN_SECRETS_ENV_) ]] ; then

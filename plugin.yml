@@ -10,4 +10,17 @@ configuration:
       type: string
     env:
       type: object
+      additionalProperties:
+        type: string
+    vars:
+      type: array
+      items:
+        type: string
+        pattern: "^[A-Za-z_][A-Za-z0-9_]*$"
+      minItems: 1
+      maxItems: 10
   required: ["role-arn"]
+  anyOf:
+    - required: ["vars"]
+    - required: ["env"]
+  additionalProperties: false
