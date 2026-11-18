@@ -8,6 +8,8 @@ configuration:
   properties:
     role-arn:
       type: string
+    session-tag:
+      type: string
     env:
       type: object
   required: ["role-arn"]

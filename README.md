@@ -14,6 +14,21 @@ Example
           SECRET: ssm-param-store-id
 ```
 
+Optionally set `session-tag` to a comma-separated list of OIDC claims to pass
+as AWS session tags (it is passed to `buildkite-agent oidc request-token
+--aws-session-tag`). The role's trust policy must then also allow
+`sts:TagSession`.
+
+```yaml
+- command: do_thing
+  plugins:
+    - LOKE/secrets#v0.0.2:
+        role-arn: arn:aws:iam::<aws-account-id>:role/<iam-role>
+        session-tag: organization_slug,pipeline_slug
+        env:
+          SECRET: ssm-param-store-id
+```
+
 You need an IAM role with trust of the oicd token, the trust policy should be
 something like
 

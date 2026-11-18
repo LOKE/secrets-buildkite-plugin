@@ -10,7 +10,12 @@ fi
 function get_secrets {
     echo "~~~ Requesting an OIDC token for AWS from buildkite"
 
-    BUILDKITE_OIDC_TOKEN="$(buildkite-agent oidc request-token --audience sts.amazonaws.com)"
+    local token_args=(--audience sts.amazonaws.com)
+    if [[ -n "${BUILDKITE_PLUGIN_SECRETS_SESSION_TAG:-}" ]]; then
+        token_args+=(--aws-session-tag "${BUILDKITE_PLUGIN_SECRETS_SESSION_TAG}")
+    fi
+
+    BUILDKITE_OIDC_TOKEN="$(buildkite-agent oidc request-token "${token_args[@]}")"
 
     echo "~~~ Assuming role using OIDC token"
 
