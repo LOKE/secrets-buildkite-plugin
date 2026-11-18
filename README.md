@@ -16,13 +16,13 @@ Example
 
 Optionally set `session-tag` to a comma-separated list of OIDC claims to pass
 as AWS session tags (it is passed to `buildkite-agent oidc request-token
---aws-session-tag`). The role's trust policy must then also allow
-`sts:TagSession`.
+--aws-session-tag`). This needs buildkite-agent v3.83.0 or later, and the
+role's trust policy must also allow `sts:TagSession`.
 
 ```yaml
 - command: do_thing
   plugins:
-    - LOKE/secrets#v0.0.2:
+    - LOKE/secrets#v0.0.3:
         role-arn: arn:aws:iam::<aws-account-id>:role/<iam-role>
         session-tag: organization_slug,pipeline_slug
         env:
